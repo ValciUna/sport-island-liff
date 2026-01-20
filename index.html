@@ -465,17 +465,32 @@
 
         // --- 主要頁面 Views ---
 
-        const HomeView = ({ courses, allCategories, isAdmin, searchTerm, setSearchTerm, selectedCategory, setSelectedCategory, onSelectCourse, onAddCourseClick, onToggleHide, onDeleteCourse }) => {
+        const HomeView = ({ courses, allCategories, isAdmin, searchTerm, setSearchTerm, selectedCategories, toggleCategory, onSelectCourse, onAddCourseClick, onToggleHide, onDeleteCourse }) => {
+            
             const filteredCourses = courses.filter(course => {
+                // 1. 搜尋字串比對
                 const matchesSearch = course.title.includes(searchTerm) || course.location.includes(searchTerm);
-                const matchesCategory = selectedCategory === "全部" || (course.categories && course.categories.includes(selectedCategory));
-                const matchesVisibility = isAdmin ? true : !course.isHidden; // Admin 看得到所有
-                const matchesHiddenFilter = isAdmin ? !course.isHidden : true; // Admin 在主頁只看未隱藏的，隱藏的在歷史區
+                
+                // 2. 標籤比對 (修正邏輯)
+                // 如果目前沒有選任何標籤 (空陣列)，則顯示全部
+                // 如果有選標籤，則檢查課程的標籤中，是否「包含」使用者選的「任何一個」標籤 (OR 邏輯)
+                let matchesCategory = true;
+                if (selectedCategories.length > 0) {
+                    if (selectedCategories.includes("全部")) {
+                        matchesCategory = true;
+                    } else {
+                        // 使用 some: 只要課程有一個標籤中了使用者的篩選，就顯示
+                        matchesCategory = Array.isArray(course.categories) && 
+                                          course.categories.some(c => selectedCategories.includes(c));
+                    }
+                }
+
+                // 3. 隱藏狀態比對
+                const matchesVisibility = isAdmin ? true : !course.isHidden; 
+                const matchesHiddenFilter = isAdmin ? !course.isHidden : true; 
+
                 return matchesSearch && matchesCategory && matchesVisibility && matchesHiddenFilter;
             });
-
-            console.log("所有課程原始資料:", courses);
-            console.log("過濾後的課程:", filteredCourses);
 
             return (
                 <div className="pb-24 md:pb-8">
@@ -495,7 +510,21 @@
                         <div className="relative">
                             <input type="text" placeholder="搜尋課程名稱、地點..." className="w-full pl-4 pr-4 py-3 rounded-xl bg-gray-100 border-none focus:ring-2 focus:ring-green-400 outline-none text-gray-700" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
-                        <div className="flex gap-2 overflow-x-auto mt-4 pb-2 no-scrollbar">{allCategories.map(cat => (<button key={cat} onClick={() => setSelectedCategory(cat)} className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${selectedCategory === cat ? 'bg-green-500 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}>{cat}</button>))}</div>
+                        {/* 標籤篩選列 (支援多選) */}
+                        <div className="flex gap-2 overflow-x-auto mt-4 pb-2 no-scrollbar">
+                            {allCategories.map(cat => {
+                                const isSelected = selectedCategories.includes(cat);
+                                return (
+                                    <button 
+                                        key={cat} 
+                                        onClick={() => toggleCategory(cat)} 
+                                        className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected ? 'bg-green-500 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200'}`}
+                                    >
+                                        {cat}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </section>
                     {isAdmin && (
                         <section className="px-4 mt-4 mb-2"><button onClick={onAddCourseClick} className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 border border-blue-200 py-3 rounded-xl font-medium active:scale-95 transition-transform hover:bg-blue-100"><Plus className="w-5 h-5" />新增課程</button></section>
@@ -573,10 +602,11 @@
             );
         };
 
-        const MembersView = ({ isAdmin, members, courses, onDeleteMember, onAddMemberClick, onToggleHideCourse, onDeleteCourse }) => {
+        const MembersView = ({ isAdmin, members, courses, onDeleteMember, onAddMemberClick, onToggleHideCourse, onDeleteCourse, onSecretAdminTrigger }) => {
             const [view, setView] = useState('menu');
             const [historySearchTerm, setHistorySearchTerm] = useState("");
             
+            // --- 歷史紀錄檢視 (管理員專用) ---
             if (isAdmin && view === 'history') {
                 const hiddenCourses = courses.filter(c => c.isHidden && c.title.includes(historySearchTerm));
                 return (
@@ -613,8 +643,18 @@
                 );
             }
 
+            // --- 主要成員檢視 ---
             return (
-                <div className="pb-24 md:max-w-2xl md:mx-auto">
+                <div className="pb-24 md:max-w-2xl md:mx-auto relative">
+                    {/* ★★★ 隱藏的透明按鈕 (左上角 50x50 像素) ★★★ */}
+                    <div 
+                        className="absolute top-0 left-0 w-16 h-16 z-50 cursor-default opacity-0"
+                        onClick={() => {
+                            // 只有在還不是管理員時，點擊才觸發驗證
+                            if (!isAdmin) onSecretAdminTrigger();
+                        }}
+                    ></div>
+
                     <div className="bg-gradient-to-b from-green-500 to-green-400 text-white pt-10 pb-20 px-6 rounded-b-[40px] text-center shadow-lg md:rounded-b-3xl md:pt-12 md:pb-24">
                         <div className="w-20 h-20 bg-white/20 rounded-full mx-auto flex items-center justify-center mb-4 backdrop-blur-sm border-2 border-white/30"><UserCircle className="w-12 h-12 text-white" /></div>
                         <h2 className="text-xl font-bold">使用者名稱</h2>
@@ -693,39 +733,35 @@
         };
 
         function App() {
-            // 0. 定義常數
             const DEFAULT_CATEGORIES = ["全部", "球類", "有氧", "瑜珈", "健身", "水上運動"];
 
-            // 1. App UI 狀態
             const [activeTab, setActiveTab] = useState('courses');
             const [isAdmin, setIsAdmin] = useState(false);
-            const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false); // ★ 新增：控制密碼框
+            const [hasAdminAccess, setHasAdminAccess] = useState(false); // ★ 新增：是否已解鎖管理權限
+            const [isAdminAuthOpen, setIsAdminAuthOpen] = useState(false);
+            
             const [searchTerm, setSearchTerm] = useState("");
-            const [selectedCategory, setSelectedCategory] = useState("全部");
+            // ★ 修改：改為陣列以支援多選，預設選中「全部」
+            const [selectedCategories, setSelectedCategories] = useState(["全部"]);
             const [allCategories, setAllCategories] = useState(DEFAULT_CATEGORIES);
+            
             const [isLoading, setIsLoading] = useState(true);
-
-            // 2. 使用者狀態
             const [liffError, setLiffError] = useState(null);
             const [currentUser, setCurrentUser] = useState(null);
 
-            // 3. 資料狀態
             const [courses, setCourses] = useState([]);
             const [members, setMembers] = useState([]);
             const [registrations, setRegistrations] = useState([]);
 
-            // 4. Modals
             const [selectedCourse, setSelectedCourse] = useState(null);
             const [isAddingCourse, setIsAddingCourse] = useState(false);
             const [isAddingMember, setIsAddingMember] = useState(false);
             const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: "", message: "", onConfirm: null, isDanger: false });
             const [alertModal, setAlertModal] = useState({ isOpen: false, title: "", message: "" });
             
-            // 5. 表單暫存
             const [newCourseData, setNewCourseData] = useState({ title: "", sessions: [], time: "", location: "", price: "", description: "", categories: [] });
             const [newMemberData, setNewMemberData] = useState({ studentName: "", parentName: "", relationship: "", gender: "男", dob: "", idNumber: "", address: "", school: "", healthCondition: "" });
 
-            // --- 初始化 LIFF ---
             useEffect(() => {
                 const initLiff = async () => {
                     try {
@@ -738,8 +774,7 @@
                                 displayName: profile.displayName,
                                 pictureUrl: profile.pictureUrl
                             });
-                            // ★ 傳送 userId 給後端進行權限判斷
-                            fetchData(profile.userId); 
+                            fetchData(profile.userId);
                         } else {
                             setIsLoading(false);
                         }
@@ -752,11 +787,9 @@
                 initLiff();
             }, []);
 
-            // --- 核心：抓取資料 (權限版) ---
             const fetchData = async (userId) => {
                 setIsLoading(true);
                 try {
-                    // ★ 這裡改用了 callApi 並帶入 userId
                     const data = await callApi('getSystemData', { userId: userId });
                     const mapped = mapServerData(data);
                     
@@ -765,9 +798,10 @@
                     setRegistrations(mapped.registrations);
                     if (mapped.categories.length > 0) setAllCategories(mapped.categories);
                     
-                    // ★ 關鍵：後端告訴前端是否為管理員
+                    // 如果後端回傳是管理員，自動解鎖並開啟權限
                     if (data.userStatus && data.userStatus.isAdmin) {
                         setIsAdmin(true);
+                        setHasAdminAccess(true); // 自動解鎖按鈕
                     }
                 } catch (err) {
                     alert("讀取資料失敗: " + err.message);
@@ -776,18 +810,15 @@
                 }
             };
 
-            // --- 核心：管理員驗證 ---
             const handleAdminAuth = async (password) => {
                 if(!password) return;
-                setIsAdminAuthOpen(false); // 先關視窗
+                setIsAdminAuthOpen(false);
                 setIsLoading(true);
-                
                 try {
                     const data = await callApi('apiVerifyAdmin', { 
                         userId: currentUser.userId, 
                         password: password 
                     });
-                    
                     const mapped = mapServerData(data);
                     setCourses(mapped.courses);
                     setMembers(mapped.members);
@@ -795,6 +826,7 @@
                     
                     if (data.userStatus && data.userStatus.isAdmin) {
                         setIsAdmin(true);
+                        setHasAdminAccess(true); // ★ 驗證成功，解鎖右上角按鈕
                         showAlert("歡迎回來", "管理員模式已啟用");
                     } else {
                         showAlert("驗證失敗", "金鑰錯誤");
@@ -806,22 +838,16 @@
                 }
             };
 
-            // --- 通用 Server Action ---
             const handleServerAction = async (actionName, payload, successMsg) => {
                 setIsLoading(true);
                 try {
-                    // 確保所有動作都帶上當前 userId，以免操作後權限丟失
-                    const fullPayload = (typeof payload === 'object') ? 
-                        { ...payload, userId: currentUser?.userId } : payload;
-
+                    const fullPayload = (typeof payload === 'object') ? { ...payload, userId: currentUser?.userId } : payload;
                     const data = await callApi(actionName, fullPayload);
                     const mapped = mapServerData(data);
-                    
                     setCourses(mapped.courses);
                     setMembers(mapped.members);
                     setRegistrations(mapped.registrations);
                     if (mapped.categories.length > 0) setAllCategories(mapped.categories);
-                    
                     if (successMsg) showAlert("成功", successMsg);
                 } catch (err) {
                     alert("操作失敗: " + err.message);
@@ -830,7 +856,6 @@
                 }
             };
 
-            // --- Handlers ---
             const showAlert = (title, message) => setAlertModal({ isOpen: true, title, message });
             const showConfirm = (title, message, onConfirm, isDanger = false) => setConfirmModal({ isOpen: true, title, message, onConfirm, isDanger });
 
@@ -839,10 +864,32 @@
             const toggleHideCourse = (id) => handleServerAction('apiToggleHideCourse', id, null);
             const handlePayment = (regId) => handleServerAction('apiPayRegistration', regId, "您已完成繳費！");
             
+            // ★ 新增：首頁標籤切換邏輯 (多選)
+            const toggleHomeFilter = (cat) => {
+                setSelectedCategories(prev => {
+                    if (cat === "全部") return ["全部"]; // 點全部就清空其他
+                    
+                    let newCats = [...prev];
+                    // 如果原本有「全部」，先移除
+                    if (newCats.includes("全部")) newCats = [];
+
+                    if (newCats.includes(cat)) {
+                        // 移除已選
+                        newCats = newCats.filter(c => c !== cat);
+                    } else {
+                        // 加入新選
+                        newCats.push(cat);
+                    }
+
+                    // 如果都沒選了，預設回「全部」
+                    if (newCats.length === 0) return ["全部"];
+                    return newCats;
+                });
+            };
+
             const handleSubmitNewCourse = (e) => {
                 e.preventDefault();
                 if (!newCourseData.title) return showAlert("錯誤", "請填寫課程名稱");
-                
                 const randomColor = Math.floor(Math.random()*16777215).toString(16);
                 const payload = {
                     ...newCourseData,
@@ -872,9 +919,7 @@
                 setNewMemberData({ studentName: "", parentName: "", relationship: "", gender: "男", dob: "", idNumber: "", address: "", school: "", healthCondition: "" });
             };
 
-            const handleDeleteMember = (id) => {
-                 alert("為保護資料，目前僅後端可刪除成員。");
-            };
+            const handleDeleteMember = (id) => alert("為保護資料，目前僅後端可刪除成員。");
 
             const handleRegister = (course, dates, member) => {
                 const payload = {
@@ -899,7 +944,6 @@
                 }, true);
             };
 
-            // 渲染邏輯：登入牆
             if (liffError) return <div className="p-8 text-center text-red-500">LIFF 初始化失敗: {liffError}</div>;
 
             if (!isLoading && !currentUser) {
@@ -917,7 +961,6 @@
                 );
             }
 
-            // 渲染邏輯：主畫面
             return (
                 <div className="bg-gray-50 min-h-screen font-sans text-gray-900 mx-auto relative shadow-2xl overflow-hidden container-fluid">
                 
@@ -937,13 +980,15 @@
                             </div>
                         )}
 
-                        {/* ★ 修改：管理員按鈕邏輯 */}
-                        <button 
-                            onClick={() => { if (!isAdmin) setIsAdminAuthOpen(true); }} 
-                            className={`ml-2 px-4 py-2 rounded-full text-sm font-bold border transition-all ${isAdmin ? 'bg-black text-white border-black cursor-default' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
-                        >
-                            {isAdmin ? '👨‍💼 管理員' : '👤 一般用戶'}
-                        </button>
+                        {/* ★ 修改：只有 hasAdminAccess 為真時才顯示切換按鈕 */}
+                        {hasAdminAccess && (
+                            <button 
+                                onClick={() => setIsAdmin(!isAdmin)} 
+                                className={`ml-2 px-4 py-2 rounded-full text-sm font-bold border transition-all ${isAdmin ? 'bg-black text-white border-black' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                            >
+                                {isAdmin ? '👨‍💼 管理員' : '👤 一般用戶'}
+                            </button>
+                        )}
                     </div>
                 </nav>
 
@@ -952,7 +997,9 @@
                         <HomeView 
                             courses={courses} allCategories={allCategories} isAdmin={isAdmin}
                             searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-                            selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory}
+                            // ★ 傳入新的多選 props
+                            selectedCategories={selectedCategories} 
+                            toggleCategory={toggleHomeFilter}
                             onSelectCourse={setSelectedCourse} onAddCourseClick={() => setIsAddingCourse(true)}
                             onToggleHide={toggleHideCourse} onDeleteCourse={handleDeleteCourse}
                         />
@@ -965,6 +1012,8 @@
                             isAdmin={isAdmin} members={members} courses={courses}
                             onDeleteMember={handleDeleteMember} onAddMemberClick={() => setIsAddingMember(true)}
                             onToggleHideCourse={toggleHideCourse} onDeleteCourse={handleDeleteCourse}
+                            // ★ 傳入觸發密碼視窗的函式
+                            onSecretAdminTrigger={() => setIsAdminAuthOpen(true)}
                         />
                     )}
                 </main>
@@ -985,7 +1034,6 @@
                     data={newMemberData} onChange={(e) => setNewMemberData(prev => ({ ...prev, [e.target.name]: e.target.value }))} 
                 />
 
-                {/* ★ 新增：管理員驗證視窗放在這裡 */}
                 <AdminAuthModal 
                     isOpen={isAdminAuthOpen} 
                     onClose={() => setIsAdminAuthOpen(false)} 
@@ -1003,9 +1051,16 @@
                 
                 <div className="md:hidden fixed top-4 right-4 z-50 flex gap-2">
                     {currentUser && <img src={currentUser.pictureUrl} className="w-8 h-8 rounded-full border border-white shadow-sm" />}
-                    <button onClick={() => { if (!isAdmin) setIsAdminAuthOpen(true); }} className={`text-white text-xs px-3 py-1.5 rounded-full shadow-lg backdrop-blur-sm border border-white/20 transition-all active:scale-95 ${isAdmin ? 'bg-black/80 cursor-default' : 'bg-black/60 hover:bg-black/80'}`}>
-                        {isAdmin ? '👨‍💼' : '👤'}
-                    </button>
+                    
+                    {/* ★ 修改手機版按鈕：只有驗證過才顯示切換紐 */}
+                    {hasAdminAccess && (
+                        <button 
+                            onClick={() => setIsAdmin(!isAdmin)} 
+                            className={`text-white text-xs px-3 py-1.5 rounded-full shadow-lg backdrop-blur-sm border border-white/20 transition-all active:scale-95 ${isAdmin ? 'bg-black/80' : 'bg-black/60 hover:bg-black/80'}`}
+                        >
+                            {isAdmin ? '👨‍💼' : '👤'}
+                        </button>
+                    )}
                 </div>
                 </div>
             );
@@ -1017,4 +1072,5 @@
 </body>
 
 </html>
+
 
