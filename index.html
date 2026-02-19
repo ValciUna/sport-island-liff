@@ -271,42 +271,44 @@
                     allowWaitlist: newCourseData.allowWaitlist, registrationDeadline: newCourseData.registrationDeadline,
                     themeColor: newCourseData.themeColor,
                     description: newCourseData.description, address: newCourseData.address, pickupPoint: newCourseData.pickupPoint, halfPrice: newCourseData.halfPrice,
-                    folderId: selectedFolder ? selectedFolder.id : null
+                    folderId: selectedFolder ? selectedFolder.id : null,
+                    // 重要: 傳遞 userId 以便後端記錄或驗證
+                    userId: userStatus.userId,
+                    action: isEditing ? 'apiUpdateCourse' : 'apiAddCourse'
                 };
 
-                const saveToLocal = (finalPayload) => {
-                    if (isEditing) setCourses(courses.map(c => c.id === editingId ? finalPayload : c));
-                    else setCourses([finalPayload, ...courses]);
-                    setAddCourseModal(false); setIsEditing(false); alert(isEditing ? '更新成功' : '建立成功');
-                    setIsLoading(false); // 關閉讀取中遮罩
-                };
+                const action = isEditing ? 'apiUpdateCourse' : 'apiAddCourse';
 
-                // 若無 Google 表單連結，且在 GAS 環境下，嘗試自動建立
-                if (!coursePayload.googleFormUrl && typeof google !== 'undefined' && google.script) {
-                    const btn = document.getElementById('save-course-btn');
-                    if (btn) btn.innerText = '正在建立表單與試算表...';
+                // 統一呼叫後端 API (包含建立表單邏輯)
+                // callApi 內部會自動判斷是 GAS 環境還是 Web 環境
+                callApi(action, coursePayload)
+                    .then(data => {
+                        // 後端回傳的是最新的系統資料 (getSystemData)
+                        if (data && data.courses) {
+                            setCourses(data.courses);
+                            // 如果有回傳 categories 或其他資料也可在此更新
+                            // setMembers(data.members); 
+                        } else {
+                            // Fallback: 如果後端只回傳單一課程或格式不同 (目前後端是回傳 getSystemData)
+                            // 這裡假設後端回傳正確，若無則手動更新 local state (較不建議，因為沒有 Form URL)
+                            console.warn('Backend did not return full system data, refetching...');
+                            // 可以在此呼叫 reloading 邏輯，或暫時只更新 local
+                        }
 
-                    google.script.run
-                        .withSuccessHandler(function (response) {
-                            if (btn) btn.innerText = isEditing ? '儲存更新' : '建立梯次';
-                            if (response && response.status === 'success') {
-                                coursePayload.googleFormUrl = response.publishedUrl;
-                                coursePayload.googleSheetUrl = response.sheetUrl; // 儲存試算表連結
-                                alert('Google 表單與試算表建立成功！\n連結已自動填入。');
-                            } else {
-                                alert('表單建立失敗，將僅儲存課程資料。\n錯誤: ' + (response ? response.message : '未知'));
-                            }
-                            saveToLocal(coursePayload);
-                        })
-                        .withFailureHandler(function (err) {
-                            if (btn) btn.innerText = isEditing ? '儲存更新' : '建立梯次';
-                            alert('呼叫後端失敗: ' + err);
-                            saveToLocal(coursePayload);
-                        })
-                        .createCourseForm(coursePayload);
-                } else {
-                    saveToLocal(coursePayload);
-                }
+                        setAddCourseModal(false);
+                        setIsEditing(false);
+                        setNewCourseData({});
+                        setSelectedFolder(null);
+                        setBatches([{ name: '第一梯次', dates: [], dateInput: '' }]);
+
+                        alert(isEditing ? '更新成功！' : '建立成功！\n表單與資料庫已在背景建立 (若有指定資料夾)。');
+                        setIsLoading(false);
+                    })
+                    .catch(err => {
+                        console.error('Save course failed:', err);
+                        alert('儲存失敗: ' + err + '\n請檢查網路或後端部署狀態。');
+                        setIsLoading(false);
+                    });
             };
 
             const stats = {
