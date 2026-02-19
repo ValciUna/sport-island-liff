@@ -149,12 +149,6 @@
                 pricingPlans: [],
                 equipmentFee: { enabled: false, price: 1000, description: '' }
             });
-            const [folderSearchQuery, setFolderSearchQuery] = useState('');
-            const [folderSearchResults, setFolderSearchResults] = useState([]);
-            const [selectedFolder, setSelectedFolder] = useState(null);
-            const [isSearchingFolder, setIsSearchingFolder] = useState(false);
-            const [browsingFolder, setBrowsingFolder] = useState({ current: null, parent: null, folders: [] });
-            const [isLoadingFolder, setIsLoadingFolder] = useState(false);
             const [isLoading, setIsLoading] = useState(false);
             const [batches, setBatches] = useState([]);
 
@@ -186,24 +180,7 @@
             const handleRemoveBatchDate = (idx, date) => setBatches(batches.map((b, i) => i === idx ? { ...b, dates: b.dates.filter(d => d !== date) } : b));
             const handleUpdateBatchName = (idx, name) => setBatches(batches.map((b, i) => i === idx ? { ...b, name } : b));
 
-            const handleBrowseFolder = (folderId = null) => {
-                setIsLoadingFolder(true);
-                callApi('getFolders', folderId)
-                    .then(data => {
-                        if (data && data.status === 'success') {
-                            setBrowsingFolder(data);
-                        } else {
-                            console.error('getFolders error:', data);
-                            alert('無法讀取資料夾: ' + (data && data.message ? data.message : JSON.stringify(data)));
-                        }
-                        setIsLoadingFolder(false);
-                    })
-                    .catch(err => {
-                        console.error('API fail:', err);
-                        alert('讀取資料夾失敗 (API): ' + err);
-                        setIsLoadingFolder(false);
-                    });
-            };
+
 
             const onEditCourse = (course) => {
                 if (!course || !course.id) {
@@ -215,8 +192,6 @@
                         description: '', address: '', pickupPoint: '', halfPrice: 0
                     });
                     setBatches([{ name: '第一梯次', dates: [], dateInput: '' }]);
-                    setSelectedFolder(null);
-                    handleBrowseFolder(null); // Init browse
                 } else {
                     setIsEditing(true);
                     setEditingId(course.id);
@@ -237,8 +212,7 @@
                     } else {
                         setBatches([{ name: '第一梯次', dates: [], dateInput: '' }]);
                     }
-                    setSelectedFolder(null);
-                    handleBrowseFolder(null); // Init browse
+
                 }
                 setAddCourseModal(true);
             };
@@ -271,8 +245,7 @@
                     allowWaitlist: newCourseData.allowWaitlist, registrationDeadline: newCourseData.registrationDeadline,
                     themeColor: newCourseData.themeColor,
                     description: newCourseData.description, address: newCourseData.address, pickupPoint: newCourseData.pickupPoint, halfPrice: newCourseData.halfPrice,
-                    // 若有選擇 selectedFolder 則使用其 ID，否則若有 browsingFolder.current 則使用該 ID (停留在該層)，否則 null (根目錄)
-                    folderId: selectedFolder ? selectedFolder.id : (browsingFolder.current ? browsingFolder.current.id : null),
+
                     // 重要: 傳遞 userId 以便後端記錄或驗證
                     userId: userStatus.userId,
                     action: isEditing ? 'apiUpdateCourse' : 'apiAddCourse'
@@ -299,10 +272,10 @@
                         setAddCourseModal(false);
                         setIsEditing(false);
                         setNewCourseData({});
-                        setSelectedFolder(null);
+
                         setBatches([{ name: '第一梯次', dates: [], dateInput: '' }]);
 
-                        alert(isEditing ? '更新成功！' : '建立成功！\n表單與資料庫已在背景建立 (若有指定資料夾)。');
+                        alert(isEditing ? '更新成功！' : '建立成功！\n已自動在試算表中建立梯次專屬分頁。');
                         setIsLoading(false);
                     })
                     .catch(err => {
@@ -362,9 +335,9 @@
                                             <button onClick={() => { const csvData = [['訂單編號', '日期', '學員', '梯次', '金額', '狀態', '末五碼']]; bookings.forEach(b => csvData.push([b.id, b.date, getMemberName(b.memberId), getCourseName(b.courseId), b.amount, b.status, b.last5Digits || ''])); const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvData.map(e => e.join(",")).join("\n"); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", "Orders.csv"); document.body.appendChild(link); link.click(); }} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-cyan-50 hover:text-cyan-600"><Download className="w-3 h-3" /> 匯出訂單</button>
                                         </div>
                                     </div>
-                                    <div className="hidden md:block overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="border-b border-slate-100 text-xs font-black text-slate-400 uppercase tracking-wider"><th className="p-3">編號</th><th className="p-3">日期</th><th className="p-3">學員</th><th className="p-3">梯次</th><th className="p-3">金額</th><th className="p-3">狀態</th><th className="p-3">操作</th></tr></thead><tbody className="text-sm font-bold text-slate-600">{bookings.filter(b => (b.id || '').includes(adminSearch) || getMemberName(b.memberId).includes(adminSearch)).map(b => (<tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50"><td className="p-3 font-mono text-xs text-slate-400">{(b.id || '').slice(-6)}</td><td className="p-3">{b.date}</td><td className="p-3 text-slate-900">{getMemberName(b.memberId)}</td><td className="p-3">{getCourseName(b.courseId)}</td><td className="p-3 font-mono">${b.amount}</td><td className="p-3"><span className={`px-2 py-1 rounded text-xs ${b.status === '已付款' ? 'bg-emerald-100 text-emerald-600' : b.status === '待核對' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{b.status}</span></td><td className="p-3"><button onClick={() => setBookings(bookings.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button></td></tr>))}</tbody></table></div>
+                                    <div className="hidden md:block overflow-x-auto"><table className="w-full text-left border-collapse"><thead><tr className="border-b border-slate-100 text-xs font-black text-slate-400 uppercase tracking-wider"><th className="p-3">編號</th><th className="p-3">日期</th><th className="p-3">學員</th><th className="p-3">梯次</th><th className="p-3">金額</th><th className="p-3">狀態</th><th className="p-3">操作</th></tr></thead><tbody className="text-sm font-bold text-slate-600">{bookings.filter(b => b.id.includes(adminSearch) || getMemberName(b.memberId).includes(adminSearch)).map(b => (<tr key={b.id} className="border-b border-slate-50 hover:bg-slate-50"><td className="p-3 font-mono text-xs text-slate-400">{b.id.slice(-6)}</td><td className="p-3">{b.date}</td><td className="p-3 text-slate-900">{getMemberName(b.memberId)}</td><td className="p-3">{getCourseName(b.courseId)}</td><td className="p-3 font-mono">${b.amount}</td><td className="p-3"><span className={`px-2 py-1 rounded text-xs ${b.status === '已付款' ? 'bg-emerald-100 text-emerald-600' : b.status === '待核對' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{b.status}</span></td><td className="p-3"><button onClick={() => setBookings(bookings.filter(x => x.id !== b.id))} className="text-slate-300 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button></td></tr>))}</tbody></table></div>
                                     <div className="md:hidden space-y-4">
-                                        {bookings.filter(b => (b.id || '').includes(adminSearch) || getMemberName(b.memberId).includes(adminSearch)).map(b => (
+                                        {bookings.filter(b => b.id.includes(adminSearch) || getMemberName(b.memberId).includes(adminSearch)).map(b => (
                                             <div key={b.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm relative">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
@@ -413,7 +386,7 @@
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {courses.filter(c => (showHiddenCourses || !c.isHidden) && (c.name || '').includes(courseSearch)).map(course => (
+                                    {courses.filter(c => (showHiddenCourses || !c.isHidden) && c.name.includes(courseSearch)).map(course => (
                                         <div key={course.id} className={`bg-slate-50 rounded-2xl p-4 border border-slate-200 hover:border-cyan-400 transition-all group relative ${course.isHidden ? 'opacity-60 grayscale' : ''}`}>
                                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEditCourse(course)} className="p-2 bg-white rounded-lg shadow-sm text-slate-400 hover:text-cyan-600"><Pencil className="w-4 h-4" /></button><button onClick={() => setCourses(courses.map(c => c.id === course.id ? { ...c, isHidden: !c.isHidden } : c))} className={`p-2 bg-white rounded-lg shadow-sm hover:text-cyan-600 ${course.isHidden ? 'text-slate-400' : 'text-cyan-600'}`}>{course.isHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
                                             <div className="hidden md:block">{course.image ? <img src={course.image} className="w-full h-32 object-cover rounded-xl mb-3 bg-slate-200" /> : <div className="w-full h-32 rounded-xl mb-3 bg-slate-200 flex items-center justify-center text-slate-400 font-bold">無圖片</div>}</div>
@@ -522,68 +495,7 @@
                                                 <div className="space-y-1 md:col-span-1"><label className="text-xs font-bold text-slate-500 text-cyan-600">Google 表單連結</label><input className="w-full p-3 bg-cyan-50 border border-cyan-100 rounded-xl text-sm font-bold text-cyan-800" value={newCourseData.googleFormUrl} onChange={e => setNewCourseData({ ...newCourseData, googleFormUrl: e.target.value })} /></div>
                                                 <div className="space-y-1 md:col-span-1"><label className="text-xs font-bold text-slate-500 text-green-600">Google 試算表連結</label><input className="w-full p-3 bg-green-50 border border-green-100 rounded-xl text-sm font-bold text-green-800" value={newCourseData.googleSheetUrl} onChange={e => setNewCourseData({ ...newCourseData, googleSheetUrl: e.target.value })} /></div>
 
-                                                <div className="col-span-1 md:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                                    <label className="text-xs font-black text-blue-600 mb-2 block">指定雲端資料夾 (建立表單與試算表位置)</label>
 
-                                                    {/* Header: Current Path / Back Button */}
-                                                    <div className="flex items-center gap-2 mb-2 bg-white p-2 rounded-lg border border-blue-200">
-                                                        {browsingFolder.parent && (
-                                                            <button onClick={() => handleBrowseFolder(browsingFolder.parent.id)} className="p-1 hover:bg-slate-100 rounded text-slate-500" title="上一層">
-                                                                <ArrowRight className="w-4 h-4 rotate-180" />
-                                                            </button>
-                                                        )}
-                                                        <div className="flex-1 font-bold text-sm text-slate-700 truncate">
-                                                            {browsingFolder.current ? `目前: ${browsingFolder.current.name}` : '載入中...'}
-                                                        </div>
-                                                        {browsingFolder.current && (
-                                                            <button
-                                                                onClick={() => setSelectedFolder(browsingFolder.current)}
-                                                                className={`px-3 py-1 rounded text-xs font-black ${selectedFolder?.id === browsingFolder.current.id ? 'bg-emerald-500 text-white' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`}
-                                                            >
-                                                                {selectedFolder?.id === browsingFolder.current.id ? '已選擇此處' : '選擇此處'}
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Folder List */}
-                                                    <div className="max-h-48 overflow-y-auto space-y-1 bg-white rounded-lg p-2 border border-blue-100">
-                                                        {isLoadingFolder ? (
-                                                            <div className="text-center py-4 text-xs text-slate-400">讀取資料夾中...</div>
-                                                        ) : (
-                                                            browsingFolder.folders.length > 0 ? (
-                                                                browsingFolder.folders.map(folder => (
-                                                                    <div key={folder.id} className="flex items-center justify-between p-2 hover:bg-blue-50 rounded group">
-                                                                        <div onClick={() => handleBrowseFolder(folder.id)} className="flex items-center gap-2 cursor-pointer flex-1">
-                                                                            <FileText className="w-4 h-4 text-yellow-500 fill-current" />
-                                                                            <span className="text-xs font-bold text-slate-700">{folder.name}</span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                            <button onClick={() => setSelectedFolder(folder)} className="px-2 py-1 bg-slate-100 text-slate-500 rounded text-[10px] font-bold hover:bg-blue-100 hover:text-blue-600">
-                                                                                選擇
-                                                                            </button>
-                                                                            <button onClick={() => handleBrowseFolder(folder.id)} className="p-1 text-slate-400 hover:text-blue-500">
-                                                                                <ChevronRight className="w-4 h-4" />
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div className="text-center py-4 text-xs text-slate-300">此資料夾沒有子資料夾</div>
-                                                            )
-                                                        )}
-                                                    </div>
-
-                                                    {/* Selected Status */}
-                                                    {selectedFolder && (
-                                                        <div className="flex items-center justify-between bg-emerald-50 p-2 rounded-lg mt-2 border border-emerald-100">
-                                                            <div className="flex items-center gap-2">
-                                                                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                                                                <span className="text-xs font-bold text-emerald-800">將建立於: {selectedFolder.name}</span>
-                                                            </div>
-                                                            <button onClick={() => setSelectedFolder(null)} className="text-emerald-400 hover:text-emerald-600"><X className="w-4 h-4" /></button>
-                                                        </div>
-                                                    )}
-                                                </div>
 
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
                                                     <div className="space-y-1 col-span-2 md:col-span-1">
@@ -648,29 +560,7 @@
             useEffect(() => localStorage.setItem('si_members', JSON.stringify(members)), [members]);
             useEffect(() => localStorage.setItem('si_bookings', JSON.stringify(bookings)), [bookings]);
 
-            // Fix Duplicate Member IDs on Mount
-            useEffect(() => {
-                const uniqueMembers = [];
-                const seenIds = new Set();
-                let hasChanges = false;
-                members.forEach(m => {
-                    const originalId = m.id;
-                    let newId = originalId;
-                    if (seenIds.has(originalId)) {
-                        newId = `${originalId}_${Math.random().toString(36).substr(2, 5)}`;
-                        hasChanges = true;
-                    }
-                    seenIds.add(originalId); // Track 'original' ID as seen? No, track if we've seen this ID already.
-                    // Actually, if input is ["A", "A", "B"], seenIds("A") -> push A. Next "A" -> seenIds has "A"? Yes -> Change ID to A_new.
-                    // But if I change it, the new ID is unique.
-                    if (newId !== originalId) {
-                        uniqueMembers.push({ ...m, id: newId });
-                    } else {
-                        uniqueMembers.push(m);
-                    }
-                });
-                if (hasChanges) setMembers(uniqueMembers);
-            }, []);
+
 
             const [activeTab, setActiveTab] = useState('courses');
             const [searchTerm, setSearchTerm] = useState('');
@@ -836,9 +726,26 @@
             return (
                 <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-24 md:pb-0 relative">
                     {/* Mobile Top Header */}
-                    <div className="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 sticky top-0 z-40 flex items-center justify-center">
+                    <div className="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 sticky top-0 z-40 flex items-center justify-center relative">
                         <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600 shadow-sm"><Palmtree size={20} /></div>
+                            <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600 shadow-sm"
+                                onClick={() => {
+                                    const pw = prompt('請輸入管理密碼：');
+                                    if (pw === null) return;
+                                    if (pw !== '888') { alert('密碼錯誤'); return; }
+                                    if (!userStatus.userId) { alert('尚未登入，無法升級'); return; }
+                                    callApi('apiPromoteAdmin', { userId: userStatus.userId, password: pw })
+                                        .then(res => {
+                                            if (res && res.status === 'success') {
+                                                alert(res.message || '已升為管理員，請重新整理頁面');
+                                                window.location.reload();
+                                            } else {
+                                                alert('失敗: ' + (res?.message || '未知錯誤'));
+                                            }
+                                        })
+                                        .catch(err => alert('API 錯誤: ' + err));
+                                }}
+                            ><Palmtree size={20} /></div>
                             <span className="text-lg font-black tracking-tighter text-slate-800">運動島<span className="text-cyan-600">館務系統</span></span>
                         </div>
                     </div>
@@ -885,7 +792,24 @@
                                     {userStatus.pictureUrl && <img src={userStatus.pictureUrl} className="w-10 h-10 rounded-full border-2 border-white shadow-sm" />}
                                     <div className="flex flex-col text-right">
                                         <span className="text-xs font-black text-slate-800">{userStatus.name || '訪客'}</span>
-                                        <span className="text-[10px] font-bold text-slate-400">{userStatus.isAdmin ? '管理員' : '一般會員'}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 cursor-pointer hover:text-slate-500 transition-colors"
+                                            onClick={() => {
+                                                const pw = prompt('請輸入管理密碼：');
+                                                if (pw === null) return;
+                                                if (pw !== '888') { alert('密碼錯誤'); return; }
+                                                if (!userStatus.userId) { alert('尚未登入，無法升級'); return; }
+                                                callApi('apiPromoteAdmin', { userId: userStatus.userId, password: pw })
+                                                    .then(res => {
+                                                        if (res && res.status === 'success') {
+                                                            alert(res.message || '已升為管理員，請重新整理頁面');
+                                                            window.location.reload();
+                                                        } else {
+                                                            alert('失敗: ' + (res?.message || '未知錯誤'));
+                                                        }
+                                                    })
+                                                    .catch(err => alert('API 錯誤: ' + err));
+                                            }}
+                                        >{userStatus.isAdmin ? '管理員' : '一般會員'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -1368,7 +1292,7 @@
                         await new Promise(r => setTimeout(r, 500));
 
                         setDebugMsg('正在執行 liff.init (Delay 500ms)...');
-                        console.log('Start liff.init');
+
 
                         // 設定 10 秒 timeout，避免永久卡住
                         const initPromise = window.liff.init({ liffId: "2008704329-qROthcbB" });
@@ -1378,7 +1302,7 @@
 
                         await Promise.race([initPromise, timeoutPromise]);
 
-                        console.log('liff.init completed');
+
                         setDebugMsg('liff.init 完成，檢查登入狀態...');
 
                         // 判斷是否由 LINE App 內開啟，或已登入
