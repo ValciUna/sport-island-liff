@@ -7,7 +7,7 @@
     <title>運動島 - 全方位管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script id="liff-sdk" charset="utf-8" src="https://static.line-scdn.net/liff/2.22.1/sdk.js"></script>
+    <script id="liff-sdk" charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     <script>
         // Init VConsole
@@ -1240,7 +1240,7 @@
                             setDebugMsg('LIFF SDK 未偵測到，嘗試動態載入...');
                             await new Promise((resolve, reject) => {
                                 const script = document.createElement('script');
-                                script.src = 'https://static.line-scdn.net/liff/2.22.1/sdk.js';
+                                script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
                                 script.onload = resolve;
                                 script.onerror = reject;
                                 document.head.appendChild(script);
