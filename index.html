@@ -1230,20 +1230,32 @@
 
                         // 1. 等待 SDK 載入 (最多等 5 秒)
                         let retries = 0;
-                        while (typeof liff === 'undefined' && retries < 20) {
+                        while (typeof window.liff === 'undefined' && retries < 20) {
                             await new Promise(r => setTimeout(r, 250));
                             retries++;
                         }
 
-                        if (typeof liff === 'undefined') {
-                            throw new Error("LIFF SDK 載入失敗 (Script Load Failed)");
+                        // 若 window.liff 仍不存在，嘗試動態載入
+                        if (typeof window.liff === 'undefined') {
+                            setDebugMsg('LIFF SDK 未偵測到，嘗試動態載入...');
+                            await new Promise((resolve, reject) => {
+                                const script = document.createElement('script');
+                                script.src = 'https://static.line-scdn.net/liff/2.22.1/sdk.js';
+                                script.onload = resolve;
+                                script.onerror = reject;
+                                document.head.appendChild(script);
+                            });
+                        }
+
+                        if (typeof window.liff === 'undefined') {
+                            throw new Error("LIFF SDK 載入失敗 (window.liff undefined)");
                         }
 
                         setDebugMsg('正在執行 liff.init...');
                         console.log('Start liff.init');
 
                         // 設定 10 秒 timeout，避免永久卡住
-                        const initPromise = liff.init({ liffId: "2008704329-qROthcbB" });
+                        const initPromise = window.liff.init({ liffId: "2008704329-qROthcbB" });
                         const timeoutPromise = new Promise((_, reject) =>
                             setTimeout(() => reject(new Error("LIFF Init Timeout (10s)")), 10000)
                         );
@@ -1256,9 +1268,9 @@
                         setIsLiffInitialized(true);
 
                         // 判斷是否由 LINE App 內開啟，或已登入
-                        if (liff.isLoggedIn()) {
+                        if (window.liff.isLoggedIn()) {
                             setDebugMsg('已登入 LIFF，取得個人檔案...');
-                            const profile = await liff.getProfile();
+                            const profile = await window.liff.getProfile();
                             setDebugMsg(`取得 Profile: ${profile.userId}`);
                             const userId = profile.userId;
 
@@ -1339,7 +1351,7 @@
                         <h2 className="text-2xl font-black text-slate-800">運動島館務系統</h2>
                         <p className="text-slate-500 font-bold text-center max-w-xs">請登入 LINE 帳號以存取系統功能</p>
                         <button
-                            onClick={() => liff.login()}
+                            onClick={() => window.liff.login()}
                             className="bg-[#06C755] hover:bg-[#05b34c] text-white px-8 py-4 rounded-2xl font-black text-lg shadow-lg shadow-emerald-100 transition-all active:scale-95 flex items-center gap-2"
                         >
                             <span>使用 LINE 登入</span>
