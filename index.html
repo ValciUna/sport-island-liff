@@ -1210,19 +1210,24 @@
             )
         };
 
+        // --- Main App Component ---
         const MainApp = () => {
             const [view, setView] = useState('user');
             const [userStatus, setUserStatus] = useState({ userId: null, isAdmin: false, name: '', pictureUrl: '' });
+            const [isLiffInitialized, setIsLiffInitialized] = useState(false);
+            const [liffError, setLiffError] = useState(null);
 
             useEffect(() => {
                 const initLIFF = async () => {
                     try {
                         await liff.init({ liffId: "2008704329-qROthcbB" });
+                        setIsLiffInitialized(true);
+
+                        // 判斷是否由 LINE App 內開啟，或已登入
                         if (liff.isLoggedIn()) {
                             const profile = await liff.getProfile();
                             const userId = profile.userId;
 
-                            // 呼叫後端驗證 (支援 GAS 與 GitHub)
                             callApi('apiLogin', userId)
                                 .then(response => {
                                     if (response) {
@@ -1235,16 +1240,43 @@
                                     }
                                 })
                                 .catch(err => console.error("Login Verify Failed:", err));
-
-                        } else {
-                            liff.login();
                         }
+                        // 注意：這裡不自動 liff.login() 以免造成無窮迴圈
                     } catch (err) {
                         console.error('LIFF Init failed', err);
+                        setLiffError(err.toString());
+                        setIsLiffInitialized(true); // 即使失敗也設為 true 以便顯示畫面
                     }
                 };
                 initLIFF();
             }, []);
+
+            if (!isLiffInitialized) {
+                return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold">載入中...</div>;
+            }
+
+            if (liffError) {
+                return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-rose-500 font-bold p-4">初始化失敗: {liffError}</div>;
+            }
+
+            // 若未登入，顯示登入按鈕 (避免鬼打牆)
+            if (!userStatus.userId) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6 space-y-6">
+                        <div className="w-24 h-24 rounded-3xl bg-cyan-50 flex items-center justify-center text-cyan-600 shadow-xl mb-4">
+                            <Palmtree size={48} />
+                        </div>
+                        <h2 className="text-2xl font-black text-slate-800">運動島館務系統</h2>
+                        <p className="text-slate-500 font-bold text-center max-w-xs">請登入 LINE 帳號以存取系統功能</p>
+                        <button
+                            onClick={() => liff.login()}
+                            className="bg-[#06C755] hover:bg-[#05b34c] text-white px-8 py-4 rounded-2xl font-black text-lg shadow-lg shadow-emerald-100 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                            <span>使用 LINE 登入</span>
+                        </button>
+                    </div>
+                );
+            }
 
             return view === 'user' ? <UserView setView={setView} userStatus={userStatus} /> : <AdminView setView={setView} userStatus={userStatus} />;
         };
