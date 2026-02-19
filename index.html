@@ -155,6 +155,7 @@
             const [isSearchingFolder, setIsSearchingFolder] = useState(false);
             const [browsingFolder, setBrowsingFolder] = useState({ current: null, parent: null, folders: [] });
             const [isLoadingFolder, setIsLoadingFolder] = useState(false);
+            const [isLoading, setIsLoading] = useState(false);
             const [batches, setBatches] = useState([]);
 
             const getMemberName = (id) => members.find(m => m.id === id)?.name || '未知會員';
