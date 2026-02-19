@@ -1263,8 +1263,6 @@
                         console.log('liff.init completed');
                         setDebugMsg('liff.init 完成，檢查登入狀態...');
 
-                        setIsLiffInitialized(true);
-
                         // 判斷是否由 LINE App 內開啟，或已登入
                         if (window.liff.isLoggedIn()) {
                             setDebugMsg('已登入 LIFF，取得個人檔案...');
@@ -1272,9 +1270,11 @@
                             setDebugMsg(`取得 Profile: ${profile.userId}`);
                             const userId = profile.userId;
 
-                            setDebugMsg('呼叫 apiLogin 驗證中...');
-                            callApi('apiLogin', userId)
-                                .then(response => {
+                            // 先設定 UserStatus，再開起畫面，避免閃爍
+                            const apiVerify = async () => {
+                                setDebugMsg('呼叫 apiLogin 驗證中...');
+                                try {
+                                    const response = await callApi('apiLogin', userId);
                                     setDebugMsg('apiLogin 回傳成功');
                                     if (response) {
                                         setUserStatus({
@@ -1284,14 +1284,19 @@
                                             pictureUrl: profile.pictureUrl
                                         });
                                     }
-                                })
-                                .catch(err => {
+                                } catch (err) {
                                     console.error("Login Verify Failed:", err);
                                     setDebugMsg(`apiLogin 失敗: ${err.message}`);
-                                });
+                                } finally {
+                                    setIsLiffInitialized(true); // 資料準備好才顯示畫面
+                                }
+                            };
+                            apiVerify();
                         } else {
-                            setDebugMsg('尚未登入');
+                            // 未登入，直接顯示 Login 畫面
+                            setIsLiffInitialized(true);
                         }
+
                     } catch (err) {
                         console.error('LIFF Init failed', err);
                         setLiffError(err.toString());
