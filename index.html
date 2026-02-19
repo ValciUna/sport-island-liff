@@ -7,7 +7,7 @@
     <title>運動島 - 全方位管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/2.22.1/sdk.js"></script>
     <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     <script>
         // Init VConsole
@@ -1228,7 +1228,15 @@
                     try {
                         setDebugMsg('正在執行 liff.init...');
                         console.log('Start liff.init');
-                        await liff.init({ liffId: "2008704329-qROthcbB" });
+
+                        // 設定 10 秒 timeout，避免永久卡住
+                        const initPromise = liff.init({ liffId: "2008704329-qROthcbB" });
+                        const timeoutPromise = new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error("LIFF Init Timeout (10s)")), 10000)
+                        );
+
+                        await Promise.race([initPromise, timeoutPromise]);
+
                         console.log('liff.init completed');
                         setDebugMsg('liff.init 完成，檢查登入狀態...');
 
@@ -1281,7 +1289,31 @@
             }
 
             if (liffError) {
-                return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-rose-500 font-bold p-4">初始化失敗: {liffError}</div>;
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-rose-500 font-bold p-4 text-center">
+                        <div className="mb-4">初始化失敗: {liffError}</div>
+                        <div className="mb-4 text-xs text-slate-500">
+                            可能的解法：<br />
+                            1. 確認 LIFF ID 正確<br />
+                            2. 確認 LINE Developer Console 的 Endpoint URL 設定正確<br />
+                        </div>
+                        <button onClick={() => window.location.reload()} className="bg-slate-800 text-white px-6 py-2 rounded-lg shadow-lg mb-4">
+                            重新整理
+                        </button>
+                        <br />
+                        <button
+                            onClick={() => {
+                                setDebugMsg('進入開發者繞過模式');
+                                setUserStatus({ userId: 'DEV_GUEST', isAdmin: true, name: '開發測試員', pictureUrl: '' });
+                                setIsLiffInitialized(true);
+                                setLiffError(null);
+                            }}
+                            className="text-slate-400 underline text-sm"
+                        >
+                            跳過登入 (Dev Mode)
+                        </button>
+                    </div>
+                );
             }
 
             // 若未登入，顯示登入按鈕 (避免鬼打牆)
