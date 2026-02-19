@@ -244,8 +244,18 @@
 
 
             const handleSaveCourse = () => {
+                // 簡單驗證
+                if (!newCourseData.name) { alert('請輸入課程名稱'); setIsLoading(false); return; }
+                if (!newCourseData.fullPrice) { alert('請輸入價格'); setIsLoading(false); return; }
+
+                setIsLoading(true); // 開啟讀取中遮罩
+
                 const hasValidBatches = batches.some(batch => batch.dates.length > 0);
-                if (!newCourseData.name || !hasValidBatches) return alert('請輸入梯次名稱並至少選擇一個日期');
+                if (!newCourseData.name || !hasValidBatches) {
+                    alert('請輸入梯次名稱並至少選擇一個日期');
+                    setIsLoading(false);
+                    return;
+                }
                 const allBatchDates = Array.from(new Set(batches.flatMap(b => b.dates))).sort();
 
                 const coursePayload = {
@@ -267,6 +277,7 @@
                     if (isEditing) setCourses(courses.map(c => c.id === editingId ? finalPayload : c));
                     else setCourses([finalPayload, ...courses]);
                     setAddCourseModal(false); setIsEditing(false); alert(isEditing ? '更新成功' : '建立成功');
+                    setIsLoading(false); // 關閉讀取中遮罩
                 };
 
                 // 若無 Google 表單連結，且在 GAS 環境下，嘗試自動建立
@@ -609,6 +620,16 @@
                             </div>
                         )}
                     </div>
+                    {/* Loading Overlay */}
+                    {isLoading && (
+                        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center backdrop-blur-sm">
+                            <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center animate-bounce-in">
+                                <div className="w-12 h-12 border-4 border-slate-200 border-t-cyan-500 rounded-full animate-spin mb-4" />
+                                <div className="text-lg font-black text-slate-700">處理中...</div>
+                                <div className="text-sm font-bold text-slate-400 mt-1">正在建立課程與雲端檔案</div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )
         };
