@@ -193,13 +193,13 @@
                             setBrowsingFolder(data);
                         } else {
                             console.error('getFolders error:', data);
-                            // alert('無法讀取資料夾');
+                            alert('無法讀取資料夾: ' + (data && data.message ? data.message : JSON.stringify(data)));
                         }
                         setIsLoadingFolder(false);
                     })
                     .catch(err => {
-                        console.error(err);
-                        // alert('讀取資料夾失敗: ' + err);
+                        console.error('API fail:', err);
+                        alert('讀取資料夾失敗 (API): ' + err);
                         setIsLoadingFolder(false);
                     });
             };
