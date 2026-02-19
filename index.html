@@ -8,11 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script id="liff-sdk" charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
-    <script>
-        // Init VConsole
-        var vConsole = new VConsole();
-    </script>
     <script src="backend.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -1251,7 +1246,10 @@
                             throw new Error("LIFF SDK 載入失敗 (window.liff undefined)");
                         }
 
-                        setDebugMsg('正在執行 liff.init...');
+                        // 稍微等待一下確保 Native Bridge 準備好 (針對 LINE In-App Browser)
+                        await new Promise(r => setTimeout(r, 500));
+
+                        setDebugMsg('正在執行 liff.init (Delay 500ms)...');
                         console.log('Start liff.init');
 
                         // 設定 10 秒 timeout，避免永久卡住
