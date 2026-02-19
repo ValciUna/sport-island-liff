@@ -7,7 +7,7 @@
     <title>運動島 - 全方位管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/2.22.1/sdk.js"></script>
+    <script id="liff-sdk" charset="utf-8" src="https://static.line-scdn.net/liff/2.22.1/sdk.js"></script>
     <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     <script>
         // Init VConsole
@@ -1226,6 +1226,19 @@
             useEffect(() => {
                 const initLIFF = async () => {
                     try {
+                        setDebugMsg('檢查 LIFF SDK...');
+
+                        // 1. 等待 SDK 載入 (最多等 5 秒)
+                        let retries = 0;
+                        while (typeof liff === 'undefined' && retries < 20) {
+                            await new Promise(r => setTimeout(r, 250));
+                            retries++;
+                        }
+
+                        if (typeof liff === 'undefined') {
+                            throw new Error("LIFF SDK 載入失敗 (Script Load Failed)");
+                        }
+
                         setDebugMsg('正在執行 liff.init...');
                         console.log('Start liff.init');
 
