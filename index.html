@@ -8,6 +8,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+    <script>
+        // Init VConsole
+        var vConsole = new VConsole();
+    </script>
     <script src="backend.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -1216,20 +1221,30 @@
             const [userStatus, setUserStatus] = useState({ userId: null, isAdmin: false, name: '', pictureUrl: '' });
             const [isLiffInitialized, setIsLiffInitialized] = useState(false);
             const [liffError, setLiffError] = useState(null);
+            const [debugMsg, setDebugMsg] = useState('準備載入 LIFF...');
 
             useEffect(() => {
                 const initLIFF = async () => {
                     try {
+                        setDebugMsg('正在執行 liff.init...');
+                        console.log('Start liff.init');
                         await liff.init({ liffId: "2008704329-qROthcbB" });
+                        console.log('liff.init completed');
+                        setDebugMsg('liff.init 完成，檢查登入狀態...');
+
                         setIsLiffInitialized(true);
 
                         // 判斷是否由 LINE App 內開啟，或已登入
                         if (liff.isLoggedIn()) {
+                            setDebugMsg('已登入 LIFF，取得個人檔案...');
                             const profile = await liff.getProfile();
+                            setDebugMsg(`取得 Profile: ${profile.userId}`);
                             const userId = profile.userId;
 
+                            setDebugMsg('呼叫 apiLogin 驗證中...');
                             callApi('apiLogin', userId)
                                 .then(response => {
+                                    setDebugMsg('apiLogin 回傳成功');
                                     if (response) {
                                         setUserStatus({
                                             userId: userId,
@@ -1239,20 +1254,30 @@
                                         });
                                     }
                                 })
-                                .catch(err => console.error("Login Verify Failed:", err));
+                                .catch(err => {
+                                    console.error("Login Verify Failed:", err);
+                                    setDebugMsg(`apiLogin 失敗: ${err.message}`);
+                                });
+                        } else {
+                            setDebugMsg('尚未登入');
                         }
-                        // 注意：這裡不自動 liff.login() 以免造成無窮迴圈
                     } catch (err) {
                         console.error('LIFF Init failed', err);
                         setLiffError(err.toString());
-                        setIsLiffInitialized(true); // 即使失敗也設為 true 以便顯示畫面
+                        setDebugMsg(`LIFF Error: ${err.toString()}`);
+                        setIsLiffInitialized(true);
                     }
                 };
                 initLIFF();
             }, []);
 
             if (!isLiffInitialized) {
-                return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 font-bold">載入中...</div>;
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-400 font-bold p-10 text-center">
+                        <div className="mb-4">載入中...</div>
+                        <div className="text-xs font-mono bg-slate-200 p-2 rounded text-slate-600 break-all">{debugMsg}</div>
+                    </div>
+                );
             }
 
             if (liffError) {
