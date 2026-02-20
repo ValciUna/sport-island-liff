@@ -660,11 +660,22 @@
                     note += ' + 器材';
                 }
 
-                const count = bookingMemberIds.length;
-                const total = basePrice * (count > 0 ? count : 1);
+                // 根據選取日期比例計算價格
+                let finalUnitPrice = basePrice;
+                const totalDatesCount = selectedCourse.dates ? selectedCourse.dates.length : 0;
 
-                return { total, note, unitPrice: basePrice };
-            }, [selectedCourse, selectedPlanIndex, wantEquipment, bookingMemberIds]);
+                // 只有當總天數 > 0 且使用者有勾選日期時，才依比例打折。
+                // 若全沒勾 (表示全選預設) 或未選任何天數，保留原價。
+                if (totalDatesCount > 0 && selectedDates.length > 0 && selectedDates.length < totalDatesCount) {
+                    finalUnitPrice = Math.round(basePrice * (selectedDates.length / totalDatesCount));
+                    note += ` (按日計比例: ${selectedDates.length}/${totalDatesCount})`;
+                }
+
+                const count = bookingMemberIds.length;
+                const total = finalUnitPrice * (count > 0 ? count : 1);
+
+                return { total, note, unitPrice: finalUnitPrice };
+            }, [selectedCourse, selectedPlanIndex, wantEquipment, bookingMemberIds, selectedDates]);
 
             const handlePaymentAndBooking = () => {
                 if (!selectedCourse || bookingMemberIds.length === 0) return alert('請至少選擇一位學員');
@@ -751,7 +762,11 @@
             };
 
             const getMemberName = (id) => members.find(m => m.id === id)?.name || '未知會員';
-            const openCourseDetail = (course) => setSelectedCourse(course);
+            const openCourseDetail = (course) => {
+                setSelectedCourse(course);
+                // Initialize selectedDates with all dates available for the course
+                setSelectedDates(course.dates || []);
+            };
             const submitMember = async (dataToSubmit, closeDialog = false) => {
                 if (!dataToSubmit.name || !dataToSubmit.phone || !dataToSubmit.idNumber || !dataToSubmit.gender || !dataToSubmit.birthday || !dataToSubmit.grade) {
                     alert('請填寫所有必填欄位 (*)');
@@ -1228,27 +1243,80 @@
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col gap-2 p-5 bg-slate-50 rounded-2xl border border-slate-100 mb-6 mx-2">
-                                            <div className="flex items-start gap-4">
-                                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm shrink-0"><MapPin className="w-5 h-5" /></div>
-                                                <div>
-                                                    <div className="font-black text-slate-800 text-lg">{selectedCourse.location}</div>
-                                                    <div className="text-sm font-bold text-slate-500 mt-1">{selectedCourse.address}</div>
-                                                    {selectedCourse.pickupPoint && <div className="text-xs font-bold text-cyan-600 mt-2 flex items-center gap-1 bg-white px-2 py-1 rounded inline-flex shadow-sm"><Navigation className="w-3 h-3" /> 接送: {selectedCourse.pickupPoint}</div>}
+                                        <div className="flex flex-col gap-3 p-5 bg-slate-50 rounded-2xl border border-slate-100 mb-6 mx-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm shrink-0"><MapPin className="w-4 h-4" /></div>
+                                                <div className="font-black text-slate-800 text-base flex-1">地點: {selectedCourse.location}</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm shrink-0"><School className="w-4 h-4" /></div>
+                                                <div className="font-black text-slate-800 text-base flex-1">適合年齡: {selectedCourse.ageGroup}</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm shrink-0"><Clock className="w-4 h-4" /></div>
+                                                <div className="font-black text-slate-800 text-base flex-1">活動時間: {selectedCourse.time}</div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3 mt-2 border-t border-slate-200 pt-3">
+                                                <div className="space-y-1">
+                                                    <div className="text-xs font-bold text-slate-400">價格</div>
+                                                    <div className="text-sm font-black text-slate-800">${selectedCourse.fullPrice || 0}</div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="text-xs font-bold text-slate-400">名額上限</div>
+                                                    <div className="text-sm font-black text-slate-800">{selectedCourse.capacity || '無限制'}</div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="text-xs font-bold text-slate-400">早鳥價格 / 截止</div>
+                                                    <div className="text-sm font-black text-slate-800">
+                                                        {selectedCourse.earlyBirdPrice ? `$${selectedCourse.earlyBirdPrice}` : '-'}
+                                                        {selectedCourse.earlyBirdDeadline ? ` / ${selectedCourse.earlyBirdDeadline}` : ''}
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="text-xs font-bold text-slate-400">報名截止日</div>
+                                                    <div className="text-sm font-black text-slate-800">{selectedCourse.registrationDeadline || '-'}</div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-4 mt-2">
-                                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm shrink-0"><School className="w-5 h-5" /></div>
-                                                <div className="font-black text-slate-800 text-lg">{selectedCourse.ageGroup}</div>
-                                            </div>
-                                            <div className="flex items-start gap-4 mt-2">
-                                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm shrink-0"><Clock className="w-5 h-5" /></div>
-                                                <div className="space-y-1 pt-1">
-                                                    <div className="text-sm font-bold text-slate-700">活動時間：{selectedCourse.scheduleInfo?.activity || selectedCourse.time}</div>
-                                                    {selectedCourse.scheduleInfo?.pickUp && <div className="text-xs font-bold text-slate-500">接送時間：{selectedCourse.scheduleInfo.pickUp}</div>}
-                                                    {(selectedCourse.morningConfig || selectedCourse.afternoonConfig) && <div className="flex gap-2 mt-1"><span className="text-[10px] bg-white px-2 py-1 rounded border border-slate-100 text-slate-400 font-bold">上午: {formatTimeSlots(selectedCourse.morningConfig) || '-'}</span><span className="text-[10px] bg-white px-2 py-1 rounded border border-slate-100 text-slate-400 font-bold">下午: {formatTimeSlots(selectedCourse.afternoonConfig) || '-'}</span></div>}
+
+                                            {/* Date Selection Buttons */}
+                                            {selectedCourse.dates && selectedCourse.dates.length > 0 && (
+                                                <div className="mt-3 pt-3 border-t border-slate-200">
+                                                    <div className="text-xs font-bold text-slate-500 mb-2 flex justify-between items-center">
+                                                        <span>日期 (點擊取消/選擇)</span>
+                                                        <span className="text-[10px] text-cyan-600 font-black px-2 py-0.5 bg-cyan-50 rounded">依選擇天數計價</span>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedCourse.dates.map(dateStr => {
+                                                            // If selectedDates is empty, it means ALL dates are selected implicitly based on previous logic, but let's make it explicit here for UI
+                                                            // We should initialize selectedDates when opening the modal, or treat empty as "all selected". 
+                                                            // Based on handleDateToggle, it toggles. We assume all selected by default.
+                                                            const isSelected = selectedDates.length === 0 || selectedDates.includes(dateStr);
+                                                            return (
+                                                                <button
+                                                                    key={dateStr}
+                                                                    onClick={() => handleDateToggle(dateStr)}
+                                                                    className={`px-3 py-1.5 rounded-xl border text-xs font-black transition-all active:scale-95 ${isSelected
+                                                                        ? 'bg-cyan-50 border-cyan-200 text-cyan-700 shadow-sm'
+                                                                        : 'bg-white border-slate-200 text-slate-400 opacity-60'
+                                                                        }`}
+                                                                >
+                                                                    {dateStr}
+                                                                </button>
+                                                            )
+                                                        })}
+                                                    </div>
+
+                                                    {/* Display dynamic price calculation */}
+                                                    <div className="mt-3 bg-cyan-600 p-3 rounded-xl shadow-md text-white flex justify-between items-center">
+                                                        <div>
+                                                            <div className="text-[10px] font-bold opacity-80 uppercase tracking-wider">合計報名費</div>
+                                                            <div className="text-xs font-bold mt-0.5 opacity-90">{priceBreakdown.note}</div>
+                                                        </div>
+                                                        <div className="text-xl font-black">${priceBreakdown.total}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
 
                                         {selectedCourse.description && (
