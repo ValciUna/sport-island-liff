@@ -728,38 +728,52 @@
 
             const getMemberName = (id) => members.find(m => m.id === id)?.name || '未知會員';
             const openCourseDetail = (course) => setSelectedCourse(course);
-            const handleRegisterSubmit = async (e) => {
-                e.preventDefault();
-                if (!formData.name || !formData.phone || !formData.idNumber || !formData.gender || !formData.birthday || !formData.grade) return alert('請填寫所有必填欄位 (*)');
+            const submitMember = async (dataToSubmit, closeDialog = false) => {
+                if (!dataToSubmit.name || !dataToSubmit.phone || !dataToSubmit.idNumber || !dataToSubmit.gender || !dataToSubmit.birthday || !dataToSubmit.grade) {
+                    alert('請填寫所有必填欄位 (*)');
+                    return false;
+                }
 
                 setIsLoading(true);
                 try {
-                    // 呼叫後端 API 新增/更新成員
                     const payload = {
-                        ...formData,
-                        userId: userStatus.userId, // 確保綁定 LINE ID
-                        studentName: formData.name, // 對應後端欄位
-                        dob: formData.birthday,     // 對應後端欄位
-                        healthCondition: formData.healthStatus,
-                        parentName: userStatus.name // 監護人預設為當前 LINE 使用者
+                        ...dataToSubmit,
+                        userId: userStatus.userId,
+                        studentName: dataToSubmit.name,
+                        dob: dataToSubmit.birthday,
+                        healthCondition: dataToSubmit.healthStatus,
+                        parentName: userStatus.name
                     };
 
                     const response = await callApi('apiAddMember', payload);
-                    if (response && response.status === 'success') {
-                        setMembers(response.members); // 更新成員列表
-                        setRegisterModal(false);
-                        setFormData({});
-                        alert('註冊成功！');
+                    if (response && response.members) {
+                        setMembers(response.members);
+                        if (closeDialog) {
+                            setRegisterModal(false);
+                            setFormData({});
+                            alert('註冊成功！');
+                        } else {
+                            setFormData({});
+                            alert('已新增，請繼續新增下一位');
+                        }
+                        return true;
                     } else {
-                        throw new Error(response ? response.message : 'Unknown error');
+                        throw new Error(response ? (response.message || '回傳資料格式錯誤') : 'Unknown error');
                     }
                 } catch (err) {
                     console.error('Register failed:', err);
                     alert('註冊失敗，請稍後再試。\n' + err.message);
+                    return false;
                 } finally {
                     setIsLoading(false);
                 }
             };
+
+            const handleRegisterSubmit = async (e) => {
+                e.preventDefault();
+                await submitMember(formData, true);
+            };
+
             const handleReportPayment = (id, code) => { setBookings(bookings.map(b => b.id === id ? { ...b, status: '待核對', last5Digits: code } : b)); alert('已回報'); };
 
             const handleCancelBooking = (booking) => {
@@ -1136,10 +1150,7 @@
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3 pt-4">
-                                        <button type="button" onClick={() => {
-                                            if (!formData.name || !formData.phone || !formData.idNumber || !formData.gender || !formData.birthday || !formData.grade) return alert('請填寫所有必填欄位 (*)');
-                                            const newMember = { id: `m${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, ...formData }; setMembers([newMember, ...members]); setFormData({}); alert('已新增，請繼續');
-                                        }} className="py-4 bg-emerald-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"><UserPlus className="w-5 h-5" /> 儲存並新增成員</button>
+                                        <button type="button" onClick={() => submitMember(formData, false)} className="py-4 bg-emerald-500 text-white rounded-2xl font-black text-sm shadow-xl shadow-emerald-200 hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"><UserPlus className="w-5 h-5" /> 儲存並新增成員</button>
                                         <button type="button" onClick={handleRegisterSubmit} className="py-4 bg-slate-900 text-white rounded-2xl font-black text-sm shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all">完成註冊</button>
                                     </div>
                                 </form>
