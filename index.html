@@ -1085,7 +1085,7 @@
                                     {members.length === 0 ? (
                                         <div className="col-span-1 md:col-span-2 text-center py-20 text-slate-400 font-bold bg-white rounded-[2.5rem] border border-slate-100">尚未註冊島民</div>
                                     ) : (
-                                        members.map(m => (<div key={m.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 text-lg">{m.name[0]}</div><div><div className="font-black text-slate-800">{m.name}</div><div className="text-xs font-bold text-slate-500">{m.identity} | {m.birthday}</div></div></div><button onClick={() => { setFormData(m); setRegisterModal(true); }}><Pencil className="w-4 h-4 text-slate-400" /></button></div>))
+                                        members.map(m => (<div key={m.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center font-black text-slate-400 text-lg">{(m.name && m.name[0]) || '?'}</div><div><div className="font-black text-slate-800">{m.name || '未命名'}</div><div className="text-xs font-bold text-slate-500">{m.identity || m.relationship || '一般'} | {m.birthday || '未提供生日'}</div></div></div><button onClick={() => { setFormData(m); setRegisterModal(true); }}><Pencil className="w-4 h-4 text-slate-400" /></button></div>))
                                     )}
                                 </div>
                             </div>
