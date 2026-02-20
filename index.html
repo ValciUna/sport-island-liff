@@ -718,12 +718,36 @@
                 const updatedCourses = courses.map(c => c.id === selectedCourse.id ? { ...c, current: newCurrent } : c);
                 setCourses(updatedCourses);
                 localStorage.setItem('si_courses_v2', JSON.stringify(updatedCourses));
-                setBookingMemberIds([]);
-                setWantEquipment(false);
-                setSelectedDates([]);
-                setSelectedCourse(null);
-                setActiveTab('records');
-                alert(bookingStatus === '候補' ? '✅ 已加入候補名單！' : `✅ 報名成功！\n\n已建立 ${bookingMemberIds.length} 筆訂單，已自動跳轉至「報名紀錄」頁面，請記得回報匯款資訊。`);
+
+                // --- ADDED: Actually send the bookings to the backend ---
+                setIsLoading(true);
+                Promise.all(newBookings.map(b => {
+                    const payload = {
+                        memberId: b.memberId,
+                        courseId: b.courseId,
+                        courseTitle: selectedCourse.name,
+                        memberName: getMemberName(b.memberId),
+                        selectedDates: b.attendDates,
+                        totalPrice: b.amount
+                    };
+                    return callApi('apiAddRegistration', payload);
+                })).then(() => {
+                    // Refresh data after successful backend write
+                    callApi('getSystemData', { userId: userStatus.userId }).then(res => {
+                        if (res && res.courses) setCourses(res.courses);
+                    });
+                }).catch(err => {
+                    console.error("Booking API Error:", err);
+                    alert("部分報名資料寫入失敗，請聯繫管理員");
+                }).finally(() => {
+                    setIsLoading(false);
+                    setBookingMemberIds([]);
+                    setWantEquipment(false);
+                    setSelectedDates([]);
+                    setSelectedCourse(null);
+                    setActiveTab('records');
+                    alert(bookingStatus === '候補' ? '✅ 已加入候補名單！' : `✅ 報名成功！\n\n已建立 ${bookingMemberIds.length} 筆訂單，已自動跳轉至「報名紀錄」頁面，請記得回報匯款資訊。`);
+                });
             };
 
             const getMemberName = (id) => members.find(m => m.id === id)?.name || '未知會員';
