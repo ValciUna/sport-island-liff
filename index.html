@@ -552,8 +552,37 @@
         // --- User View Component ---
         const UserView = ({ setView, userStatus }) => {
             const [courses, setCourses] = useState(() => JSON.parse(localStorage.getItem('si_courses_v2')) || INITIAL_COURSES);
-            const [members, setMembers] = useState(() => JSON.parse(localStorage.getItem('si_members')) || INITIAL_MEMBERS);
+            const [members, setMembers] = useState(() => JSON.parse(localStorage.getItem('si_members')) || []);
             const [bookings, setBookings] = useState(() => JSON.parse(localStorage.getItem('si_bookings')) || []);
+            const [isLoading, setIsLoading] = useState(false);
+
+            // 初始載入：呼叫後端取得最新資料 (包含成員、課程、訂單)
+            useEffect(() => {
+                const fetchData = async () => {
+                    if (!userStatus.userId) return;
+                    setIsLoading(true);
+                    try {
+                        const data = await callApi('getSystemData', { userId: userStatus.userId });
+                        if (data) {
+                            if (data.courses) setCourses(data.courses);
+                            if (data.members) setMembers(data.members);
+                            if (data.registrations) {
+                                // 轉換後端訂單格式為前端格式 (若有需要)
+                                // 目前後端回傳的是 raw rows, 前端 bookings 是物件陣列
+                                // 暫時維持現狀，若後端回傳格式與前端不符需在此轉換
+                                // 假設後端回傳的 registrations 需要被轉換:
+                                // setBookings(data.registrations...); 
+                                // 暫時保留 local, 之後可進一步整合
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Fetch system data failed:', e);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+                fetchData();
+            }, [userStatus.userId]);
 
             useEffect(() => localStorage.setItem('si_courses_v2', JSON.stringify(courses)), [courses]);
             useEffect(() => localStorage.setItem('si_members', JSON.stringify(members)), [members]);
@@ -699,12 +728,37 @@
 
             const getMemberName = (id) => members.find(m => m.id === id)?.name || '未知會員';
             const openCourseDetail = (course) => setSelectedCourse(course);
-            const handleRegisterSubmit = (e) => {
+            const handleRegisterSubmit = async (e) => {
                 e.preventDefault();
                 if (!formData.name || !formData.phone || !formData.idNumber || !formData.gender || !formData.birthday || !formData.grade) return alert('請填寫所有必填欄位 (*)');
-                if (formData.id) setMembers(members.map(m => m.id === formData.id ? formData : m));
-                else setMembers([{ id: `m${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, ...formData }, ...members]);
-                setRegisterModal(false); setFormData({}); alert('成功');
+
+                setIsLoading(true);
+                try {
+                    // 呼叫後端 API 新增/更新成員
+                    const payload = {
+                        ...formData,
+                        userId: userStatus.userId, // 確保綁定 LINE ID
+                        studentName: formData.name, // 對應後端欄位
+                        dob: formData.birthday,     // 對應後端欄位
+                        healthCondition: formData.healthStatus,
+                        parentName: userStatus.name // 監護人預設為當前 LINE 使用者
+                    };
+
+                    const response = await callApi('apiAddMember', payload);
+                    if (response && response.status === 'success') {
+                        setMembers(response.members); // 更新成員列表
+                        setRegisterModal(false);
+                        setFormData({});
+                        alert('註冊成功！');
+                    } else {
+                        throw new Error(response ? response.message : 'Unknown error');
+                    }
+                } catch (err) {
+                    console.error('Register failed:', err);
+                    alert('註冊失敗，請稍後再試。\n' + err.message);
+                } finally {
+                    setIsLoading(false);
+                }
             };
             const handleReportPayment = (id, code) => { setBookings(bookings.map(b => b.id === id ? { ...b, status: '待核對', last5Digits: code } : b)); alert('已回報'); };
 
