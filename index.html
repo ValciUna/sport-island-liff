@@ -139,7 +139,8 @@
                                     date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('zh-TW') : '',
                                     amount: r.amount,
                                     last5Digits: r.last5Digits,
-                                    attendance: r.attendance,
+                                    attendance: Object.keys(r.attendance || {}).reduce((acc, key) => ({ ...acc, [key]: r.attendance[key]?.status }), {}),
+                                    attendanceRemarks: Object.keys(r.attendance || {}).reduce((acc, key) => ({ ...acc, [key]: r.attendance[key]?.note }), {}),
                                     attendDates: r.selectedDates
                                 })));
                             }
