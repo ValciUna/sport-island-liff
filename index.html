@@ -783,6 +783,21 @@
                     // Refresh data after successful backend write
                     callApi('getSystemData', { userId: userStatus.userId }).then(res => {
                         if (res && res.courses) setCourses(res.courses);
+                        if (res && res.members) setMembers(res.members);
+                        if (res && res.registrations) {
+                            setBookings(res.registrations.map(r => ({
+                                id: r.id,
+                                memberId: r.memberId,
+                                courseId: r.courseId,
+                                status: r.status,
+                                date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('zh-TW') : '',
+                                amount: r.amount,
+                                last5Digits: r.last5Digits,
+                                attendance: Object.keys(r.attendance || {}).reduce((acc, key) => ({ ...acc, [key]: r.attendance[key]?.status }), {}),
+                                attendanceRemarks: Object.keys(r.attendance || {}).reduce((acc, key) => ({ ...acc, [key]: r.attendance[key]?.note }), {}),
+                                attendDates: r.selectedDates
+                            })));
+                        }
                     });
                 }).catch(err => {
                     console.error("Booking API Error:", err);
